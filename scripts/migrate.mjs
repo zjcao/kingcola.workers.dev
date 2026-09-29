@@ -22,7 +22,7 @@
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { deployTarget } from './lib/deploy-target.mjs'
+import { deployTarget, readDeployFile } from './lib/deploy-target.mjs'
 
 /** 部署目标（账号 / API Token）：环境变量 → .env.deploy —— 换账号时不用改仓库 */
 const TARGET = deployTarget()
@@ -55,6 +55,10 @@ if (target !== 'local' && target !== 'remote') {
  * （`d1 execute` 认库名，不需要 database_id）。
  */
 function databaseName() {
+  // 本机 `.env.deploy` 指定了「要复用哪个库」就直接用 ID —— 没有 D1 读权限的账号（例如工作室那个）
+  // 只有这样才能执行；否则按 wrangler.toml 里的库名走（普通账号的默认路径）。
+  const id = (readDeployFile().D1_DATABASE_ID ?? '').trim()
+  if (id) return id
   const hit = /^\s*database_name\s*=\s*"([^"]+)"/m.exec(readFileSync(resolve(ROOT, 'wrangler.toml'), 'utf8'))
   return hit ? hit[1] : 'kingcola-db'
 }

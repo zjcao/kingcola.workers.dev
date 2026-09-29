@@ -119,6 +119,10 @@
   ⚠️ 坑：`spawnSync('npx', [...], { shell: true })` 下，`--command "SELECT ... "` 里的**空格会被 shell 拆成多个参数** →
   命令静默失败 → 脚本误判「库是空的」→ 曾在线上跑起 `0001`（万幸它全是 `CREATE TABLE IF NOT EXISTS`，无数据损失）。
   修法：直接 `node node_modules/wrangler/bin/wrangler.js`（不过 shell）＋ 探测失败时**中止**而不是继续跑迁移。
+- **部署时自动建表（2026-09-29 加）**：`ci-deploy.mjs` **部署前**先跑 `scripts/migrate.mjs remote`（= `npm run db:migrate:remote` 等价物）。
+  语义：成功就继续；**失败只警告、不阻断**（`MIGRATE_STRICT=1` 可改为阻断）；`SKIP_MIGRATE=1` / `--dry-run` 跳过。
+  之所以「不阻断」：Workers Builds 自动生成的 token **没有 D1 权限**，在 CI 里这步必然失败，不该把部署一起拖挂。
+  同时 `migrate.mjs` 优先用本机 `.env.deploy` 的 `D1_DATABASE_ID`（没有 D1 读权限的账号否则连库都定位不到）。
 - **部署入口 `node scripts/ci-deploy.mjs`**（`npm run deploy` 与 Workers Builds 的 Deploy command 都用它）：先 `wrangler r2 bucket list` 探测 R2，能用就原样部署，**不能用就临时剔掉 `[[r2_buckets]]` 再部署**（自动降级）。`FORCE_NO_R2=1` 强制降级、`--dry-run` 演练。⚠️ 因此 `wrangler.toml` 的 `[[r2_buckets]]` 绝不能手动删（`wrangler dev` 靠它模拟本地 R2 桶，本地开发与 smoke 8a/8b 都依赖）。
 - ⚠️⚠️ **PBKDF2 迭代数受 Workers CPU 预算硬约束**：本项目账号是免费版，`worker/lib/crypto.ts` 原 150 000 次 → 线上必挂（登录/初始化返 `500 服务异常`，纯读接口全正常，极易误判成数据库/绑定问题）。实测 4 万/6 万/10 万通过、**15 万必挂** → 已改成 **50 000** 并部署验证。**已存哈希自带迭代数**，改常量不会让旧密码失效；旧哈希若本身超预算仍 500，用 bootstrap 重置一次即可。想恢复 60 万次：先升级 Workers Paid。
 - ⚠️ **`wrangler secret put` 千万别用管道喂值**（会把换行一起存进去，之后怎么手输都对不上 —— 本项目踩过「恢复口令不正确」）。脚本化写密钥用 **`wrangler secret bulk secrets.json`**。排查技巧：bootstrap **先验口令、后验密码**，可用「真口令 + 1 位密码」非破坏性校验（`400 WEAK_PASSWORD`=口令对，`403 INVALID_TOKEN`=口令错，都不建号）。

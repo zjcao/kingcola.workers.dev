@@ -193,6 +193,32 @@ function main() {
 
   if (dryRun) args.push('--dry-run')
 
+  // 先建表、再部署：新代码可能依赖新表/新列。失败只警告、不阻断（除非 MIGRATE_STRICT=1）——
+  // 例如 Workers Builds 自动生成的 token 没有 D1 权限，那一步在 CI 里必然失败，不该把部署一起拖挂。
+  // 跳过：SKIP_MIGRATE=1（或 --dry-run）。
+  if (!dryRun && process.env.SKIP_MIGRATE !== '1') {
+    console.log('\n· 先跑数据库迁移（等价于 npm run db:migrate:remote）…')
+    const migrate = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'migrate.mjs'), 'remote'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, ...TARGET.env },
+    })
+    const out = `${migrate.stdout ?? ''}${migrate.stderr ?? ''}`
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .slice(-3)
+      .join('\n  ')
+    if (migrate.status === 0) {
+      console.log(`  ✓ 迁移完成\n  ${out}`)
+    } else if (process.env.MIGRATE_STRICT === '1') {
+      console.error(`  ✘ 迁移失败，MIGRATE_STRICT=1 → 中止部署\n  ${out}`)
+      process.exit(1)
+    } else {
+      console.warn(`  ⚠️ 迁移没成功，继续部署（要让它阻断部署就设 MIGRATE_STRICT=1）\n  ${out}`)
+    }
+  }
+
   try {
     const result = wrangler(args, { inherit: true })
     process.exitCode = result.status ?? 1
