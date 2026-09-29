@@ -48,8 +48,16 @@ export async function runPendingMigrations(env: Env): Promise<MigrateResult> {
   return { ok: true, applied }
 }
 
-/** 是否已经安装（存在任意管理员 = 已安装） */
+/**
+ * 是否已经安装：**部署配置显式声明** 或 **D1 里已有管理员**。
+ *
+ * `INSTALL_STATE` 是部署侧（构建/面板）写进来的标志，运行时改不了它 —— 所以：
+ * 装完之后请在**面板的环境变量里**把它覆盖成 `installed`（不要把这个状态提交回仓库，
+ * 它属于「某个部署的当前状态」，不是项目的通用默认值）。它的好处是：
+ * 重新部署后不必等一次 D1 查询就能直接锁死安装入口。
+ */
 export async function isInstalled(env: Env): Promise<boolean> {
+  if ((env.INSTALL_STATE ?? '').trim().toLowerCase() === 'installed') return true
   if (!env.DB) return false
   try {
     const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM admin_users').first<{ n: number }>()

@@ -131,8 +131,11 @@
   README 的「本地首次使用」与密钥表已改成「打开 `/install` 安装」。
   校验：`tsc -b` ✓、`eslint` ✓、`npm run build` ✓、已提交推送 ✓。
   ⚠️ **文档里还剩几处旧文案没清**（README 的「部署 → 5. 初始化管理员」小节、HANDOVER 第 5 节
-  与第 7 节的 `RECOVERY_TOKEN` 恢复段）；⚠️ **端到端没跑过**（本机 `wrangler dev` + 本地 D1 走一遍
+  与第 7 节的 `RECOVERY_TOKEN` 恢复段）；  ⚠️ **端到端没跑过**（本机 `wrangler dev` + 本地 D1 走一遍
   「打开 /install → 建表 → 建号 → 登录」），下次接着做。
+  ✅ `INSTALL_STATE` 已接进判断（2026-09-29）：`isInstalled()` = `env.INSTALL_STATE === 'installed'` **或** D1 里有管理员。
+  它的用法：装完之后在**面板的环境变量**里把它覆盖成 `installed`（**别提交回仓库** —— 那是某个部署的状态，
+  不是项目通用默认值）；好处是重新部署后不必等 D1 查询就能锁死安装入口。全新部署仍是 `uninstalled`，行为不变。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
