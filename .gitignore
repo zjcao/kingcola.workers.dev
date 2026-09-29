@@ -19,6 +19,9 @@ dev-server.err
 # scripts/ci-deploy.mjs 生成的「无 R2」临时配置（部署完即删，这里只是兜底）
 wrangler.ci-no-r2.toml
 
+# scripts/pages-deploy.mjs 生成的 Pages 临时配置（含本机 .env.deploy 注入的账号信息）
+wrangler.pages.local.toml
+
 node_modules
 dist
 dist-ssr
