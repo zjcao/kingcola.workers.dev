@@ -73,6 +73,22 @@
   **没有 `RECOVERY_TOKEN`**（要初始化管理员得补）。
   → 我们只需**部署代码上去**，不在那边新建任何资源；因为没有 D1 权限，部署时应把它已有的 ID 从本机 `.env.deploy` 注入临时配置
   （仓库里保持无 ID）。⚠️ 在 `czjing` 里读自定义域名是 **403**（权限不够）→ 域名只能对方在面板处理。
+  **2026-09-29 已完成部署**：`ci-deploy.mjs` 新增 `injectIds()`（读本机 `.env.deploy` 的 `D1_DATABASE_ID` / `KV_NAMESPACE_ID`，
+  注入临时配置后 `--config` 部署；有 IDs 时**不做 R2 降级**，因为资源早已绑好）；`.env.deploy` 指向
+  `WORKER_NAME=kingcola-pages-dev` + `CLOUDFLARE_ACCOUNT_ID=738bff0c…` + 两个 ID。部署成功、无报错，
+  地址 **`https://kingcola-pages-dev.zjcao.workers.dev`**（账号 workers.dev 子域是 `zjcao`）；
+  补写了 **`RECOVERY_TOKEN`**（只这一个键，没覆盖对方的 SESSION/STUDENT 密钥）。
+  ⚠️ **`*.workers.dev` 在这台机器上 HTTPS 被 SNI 阻断**（`curl: (35) Recv failure: Connection was reset`）→
+  验证要走**纯 HTTP + 固定边缘 IP**：`curl --resolve <host>:80:<CF 边缘IP> http://<host>/api/health`（实测 200 ✓）。
+  ⚠️ **`czjing` 账号里没有任何 zone** → 在那个账号里**没法绑自定义域名**（国内也就访问不了 workers.dev）→
+  要「国内能正常用」，要么让工作室给该账号加一个域名/zone，要么改部署到用户自己那个账号（它有
+  `bilibili.fit` / `mcrem.top` / `mcserver.top` 三个 zone）。
+  ⚠️ **部署后它仍不可用**：静态页 200 ✓ 但 API 一律 500（`INTERNAL_ERROR 服务异常`）—— 与「它的 D1 从未建过表」吻合
+  （对方 10 次部署只传代码、没跑迁移）。而我们对那个 D1 **没有写权限**：`wrangler d1 execute <id> --remote` → `Authentication error`
+  （成员权限 `d1.read=false`；建一张探针表也被拒）→ **迁移只能由工作室跑**（他们本地/流水线执行 `npm run db:migrate:remote` 即可，
+  台账逻辑在仓库里 ✓），或让管理员放宽 D1 权限后再由我们跑。
+  ⚠️ `czjing` 的 workers.dev HTTPS 在国内被 **SNI 阻断**（实测 `curl: (35) Recv failure: Connection was reset`；纯 HTTP 才通）→
+  **国内访问不了**。结论：这个 Worker 要「正常使用」，必须先解决①D1 迁移（对方权限）②域名（对方账号里要有 zone）。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）

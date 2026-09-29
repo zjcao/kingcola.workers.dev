@@ -31,7 +31,7 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { deployTarget } from './lib/deploy-target.mjs'
+import { deployTarget, readDeployFile } from './lib/deploy-target.mjs'
 
 /** 部署目标（Worker 名 / 账号 / API Token）：环境变量 → .env.deploy → wrangler.toml */
 const TARGET = deployTarget()
@@ -132,6 +132,21 @@ function deployName() {
   return ''
 }
 
+/**
+ * 复用已有资源：把本机 `.env.deploy` 里的 D1 / KV ID 写进临时配置。
+ * 仓库里永远不出现 ID；对「没有 D1 读权限」的账号（例如此次的工作室账号）也只有这样
+ * 才不会去「按名字找」（那一步会因权限不足而失败）。
+ */
+function injectIds(source) {
+  const file = readDeployFile()
+  let out = source
+  const d1 = (file.D1_DATABASE_ID ?? '').trim()
+  if (d1) out = out.replace(/^(\s*database_name\s*=\s*"[^"]*"\s*)$/m, `$1\ndatabase_id = "${d1}"`)
+  const kv = (file.KV_NAMESPACE_ID ?? '').trim()
+  if (kv) out = out.replace(/^(\s*binding\s*=\s*"CONFIG_KV"\s*)$/m, `$1\nid = "${kv}"`)
+  return out
+}
+
 function main() {
   const argv = process.argv.slice(2)
   const dryRun = argv.includes('--dry-run')
@@ -147,8 +162,22 @@ function main() {
     args.push('--name', name)
   }
 
-  if (r2.ok) {
-    console.log('· 检测到账号已开通 R2 → 按 wrangler.toml 原样部署（含 FILES 绑定）')
+  const fileVars = readDeployFile()
+  const hasIds = Boolean((fileVars.D1_DATABASE_ID ?? '').trim() || (fileVars.KV_NAMESPACE_ID ?? '').trim())
+
+  if (r2.ok || hasIds) {
+    // 「资源早就绑好了」的场景（本机 .env.deploy 给了 ID）：原样声明，不降级、不删绑定
+    console.log(
+      r2.ok
+        ? '· 检测到账号已开通 R2 → 按 wrangler.toml 原样部署（含 FILES 绑定）'
+        : '· R2 探测不可用，但目标 Worker 的资源已就绪 → 原样声明，不做降级',
+    )
+    if (hasIds) console.log('· 按本机 .env.deploy 里的 D1 / KV ID 复用已有资源（不在账号里新建）')
+    writeFileSync(
+      resolve(ROOT, GENERATED),
+      `${injectIds(readFileSync(resolve(ROOT, 'wrangler.toml'), 'utf8')).trimEnd()}\n`,
+    )
+    args.push('--config', GENERATED)
   } else {
     console.log(`· 未探测到可用的 R2（${r2.reason}）→ 自动降级：本次部署不带 FILES 绑定`)
     console.log('  应用不会崩：上传/报名表接口返回 503「对象存储未接通」。')
