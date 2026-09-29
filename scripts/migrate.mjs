@@ -22,6 +22,7 @@
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { wranglerEnv } from './lib/account.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 /**
@@ -59,7 +60,11 @@ const DB = databaseName()
 
 /** 跑一段 wrangler 命令，把 stdout / stderr 都收回来（已去 ANSI 颜色） */
 function wrangler(args) {
-  const result = spawnSync(process.execPath, [WRANGLER, ...args], { cwd: ROOT, encoding: 'utf8' })
+  const result = spawnSync(process.execPath, [WRANGLER, ...args], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: wranglerEnv(),
+  })
   const text = `${result.stdout ?? ''}${result.stderr ?? ''}`.replace(/\u001b\[[0-9;]*m/g, '')
   return { status: result.status ?? 1, text }
 }

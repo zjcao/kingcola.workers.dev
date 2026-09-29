@@ -23,6 +23,7 @@ import { randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { wranglerEnv } from './lib/account.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const WRANGLER = resolve(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js')
@@ -96,7 +97,11 @@ function setValue(text, key, value) {
 }
 
 function wrangler(args) {
-  const result = spawnSync(process.execPath, [WRANGLER, ...args], { cwd: ROOT, encoding: 'utf8' })
+  const result = spawnSync(process.execPath, [WRANGLER, ...args], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: wranglerEnv(),
+  })
   return `${result.stdout ?? ''}${result.stderr ?? ''}`.replace(/\u001b\[[0-9;]*m/g, '').trim()
 }
 
