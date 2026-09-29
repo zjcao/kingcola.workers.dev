@@ -66,6 +66,13 @@
     R2 未建桶（部署脚本会自动降级 ✓）、**有 3 个 zone**：`bilibili.fit` / `mcrem.top` / `mcserver.top`（都 active ✓）。
   ⚠️ 旧账号 `fzqcloud` 的登录已按用户要求清空 → `kingcola.002038.xyz` 那套线上站**以后管不到**（站点本身仍在跑）。
   ⚠️ 这份登录含两个账号 → wrangler 命令必须显式 `CLOUDFLARE_ACCOUNT_ID`，否则可能走错账号。
+- 🎯 **真正的部署目标 = `czjing` 里那个已经配好的 Worker `kingcola-pages-dev`**（用户 2026-09-29：「第二个号只有一个 worker」）：
+  它是对方（工作室）为本项目建的，**绑定与密钥都已就绪、已有 10 次部署历史** ——
+  `DB`(D1) `baccd871-1b1e-4f65-85f2-21e7035f69de`、`CONFIG_KV` `e2eae0fcdc0644849829adae21a95abe`、
+  `FILES`(R2) `kingcola-files`、`SSO_CLIENT_ID=kingcola`、以及 **`SESSION_SECRET` / `STUDENT_SESSION_SECRET`（对方设的，别覆盖 ✗）**；
+  **没有 `RECOVERY_TOKEN`**（要初始化管理员得补）。
+  → 我们只需**部署代码上去**，不在那边新建任何资源；因为没有 D1 权限，部署时应把它已有的 ID 从本机 `.env.deploy` 注入临时配置
+  （仓库里保持无 ID）。⚠️ 在 `czjing` 里读自定义域名是 **403**（权限不够）→ 域名只能对方在面板处理。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
