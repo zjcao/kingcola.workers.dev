@@ -22,7 +22,10 @@
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { wranglerEnv } from './lib/account.mjs'
+import { deployTarget } from './lib/deploy-target.mjs'
+
+/** 部署目标（账号 / API Token）：环境变量 → .env.deploy —— 换账号时不用改仓库 */
+const TARGET = deployTarget()
 
 const ROOT = resolve(import.meta.dirname, '..')
 /**
@@ -63,7 +66,7 @@ function wrangler(args) {
   const result = spawnSync(process.execPath, [WRANGLER, ...args], {
     cwd: ROOT,
     encoding: 'utf8',
-    env: wranglerEnv(),
+    env: { ...process.env, ...TARGET.env },
   })
   const text = `${result.stdout ?? ''}${result.stderr ?? ''}`.replace(/\u001b\[[0-9;]*m/g, '')
   return { status: result.status ?? 1, text }

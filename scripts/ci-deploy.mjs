@@ -31,7 +31,10 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { accountId, wranglerEnv } from './lib/account.mjs'
+import { deployTarget } from './lib/deploy-target.mjs'
+
+/** 部署目标（Worker 名 / 账号 / API Token）：环境变量 → .env.deploy → wrangler.toml */
+const TARGET = deployTarget()
 
 const ROOT = resolve(import.meta.dirname, '..')
 /** 生成出来的「无 R2」配置：部署完即删，同时也写进 .gitignore 兜底 */
@@ -47,7 +50,8 @@ function wrangler(args, { inherit = false } = {}) {
     shell: IS_WINDOWS,
     encoding: 'utf8',
     stdio: inherit ? 'inherit' : 'pipe',
-    env: wranglerEnv(),
+    // 配了 API Token / 账号 ID 就带上（没配 = 继续用 wrangler 的登录态）
+    env: { ...process.env, ...TARGET.env },
   })
 }
 
@@ -142,10 +146,6 @@ function main() {
     console.log(`· 按本机 .env.deploy / WORKER_NAME 指定的名字部署：${name}`)
     args.push('--name', name)
   }
-
-  // 目标账号同样属于「账号专属信息」，放在本机 .env.deploy 的 ACCOUNT_ID 里
-  const account = accountId()
-  if (account) console.log(`· 目标账号：${account}（来自 .env.deploy / CLOUDFLARE_ACCOUNT_ID）`)
 
   if (r2.ok) {
     console.log('· 检测到账号已开通 R2 → 按 wrangler.toml 原样部署（含 FILES 绑定）')

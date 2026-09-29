@@ -205,6 +205,8 @@ npm run deploy        # = npm run build && node scripts/ci-deploy.mjs
 >   临时一次性的也可以 `npm run deploy -- --name <项目名>`，或设环境变量 `WORKER_NAME`。
 >   （用 Git 连接构建时没有这个文件，就按默认名走 —— Cloudflare 会用面板项目名覆盖，
 >   日志里那句 `Failed to match Worker name` 只是警告，部署照样成功。）
+>   同一个 `.env.deploy` 里还能写 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`：**换账号时比重新
+>   `wrangler login` 稳**（不走 `localhost` 回调，也不会覆盖你已有的登录态），部署 / 迁移 / 写密钥三个脚本都会自动带上。
 > - **自定义域名**：面板 → 选中本 Worker → Settings → Domains & Routes → Add custom domain
 >   （加一次即可，后续部署不会清掉）；也可以 `npm run deploy -- --domains <你的域名>`。
 >   线上**必须**有自己的域名：`*.workers.dev` 在国内被 DNS 污染，干脆访问不了
