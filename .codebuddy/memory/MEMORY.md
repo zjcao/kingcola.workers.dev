@@ -21,6 +21,14 @@
 - 含中文的 `.ps1` 必须 `pwsh`（5.1 编码错乱）。wrangler 4.137.0。本地密钥 `.dev.vars`（gitignore），本地管理员 `admin` / `kingcola-dev-2026`。
 - 命令：本地验收 `npm run local`（8787）/ 开发 `dev:api`+`dev`（5175）/ `typecheck`·`build`·`deploy` / `db:migrate:local|remote` / `secrets:init`。自检：`scripts/smoke-api.ps1`、`smoke-applications.ps1`、`probe-local.ps1`。
 
+## Git 远端（⚠️ 绝不能强推 main）
+- **`cao-teachers-fork`** → `https://github.com/zjcao/kingcola.pages.dev`：**`main` 的 upstream**，`git push` 即推它。
+  ⚠️ 旧的 `kingcalo-icg-home` / `thebestskinhead/kingcola-icg-home` 已不存在，写它会报 `does not appear to be a git repository`。
+- **`test-dev`** → `https://github.com/thebestskinhead/kingcola.git`（2026-09-29 已推送）：它的 `main` 是 cloudflare[bot] 的一条
+  `source repo import`，与本仓库**无共同祖先**、内容等于本仓库较早状态 → 合并用
+  `git merge test-dev/main --allow-unrelated-histories -X ours`（保留双方历史、内容以本地为准）后普通推送，**不要 `--force`**。
+- 中文提交信息一律写 UTF-8 文件 + `git commit -F <file>`（勿用 `-m`）。
+
 ## 线上与部署（Cloudflare）
 - **当前线上入口**：`https://kingcola-pages-dev.zjcao.workers.dev`（账号 `czjing` `738bff0c…`，工作室对方建的 Worker `kingcola-pages-dev`，绑定/密钥已就绪、只差 `RECOVERY_TOKEN` 且已补；代码由我们 `ci-deploy.mjs` 部署）。
   它已部署成功 ✓，但静态页 200 而 **API 全 500** —— 那个 D1 从未建过表，而我们对它**没有 D1 写权限**（`Authentication error`）→ 迁移只能由对方跑。
