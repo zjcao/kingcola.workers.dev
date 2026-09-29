@@ -59,7 +59,8 @@
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
-  ② `workers_dev = false`（**至今仍在** ✗）。两行叠在一起的后果是「不绑域名 + 也不给 workers.dev」——
+  ② `workers_dev = false`（2026-09-29 用户要求后**已删除** ✓ —— `wrangler.toml` 现在刻意不写这个键，
+  默认「谁部署谁有个 workers.dev 地址」）。两行叠在一起的后果曾是「不绑域名 + 也不给 workers.dev」——
   任何人（包括换账号后的自己）部署完线上**没有任何入口**，连"先用 workers.dev 顶着"都做不到。
   正确做法：仓库只留通用默认（`workers_dev` 干脆不写 = 谁部署谁有个 workers.dev 地址），
   要关的人自己在本地改；账号 / Worker 名 / Token 这类差异一律放本机 `.env.deploy`（gitignore）

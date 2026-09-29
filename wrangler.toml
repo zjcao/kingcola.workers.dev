@@ -20,9 +20,10 @@ name = "kingcola"
 main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 
-# 只走自定义域名（绑法见下）：`*.workers.dev` 在国内被 DNS 污染，留着也没用，
-# 而且这一行能让部署日志不再提示「workers_dev 未设置」。
-workers_dev = false
+# ⚠️ 这里**刻意不写** `workers_dev`：默认每个部署者都能拿到 `<Worker 名>.<你的子域>.workers.dev`
+# 这个地址 —— 先能跑起来比什么都重要。要不要关掉它属于**部署者自己的选择**，不该由仓库替谁决定。
+# 国内线上（`*.workers.dev` 被 DNS 污染、只走自有域名）请**在本机**改成 `workers_dev = false`
+# 或走面板，别提交回来。
 
 # ---------------------------------------------------------------------------
 # 静态资源：dist/ 由 Vite 构建
