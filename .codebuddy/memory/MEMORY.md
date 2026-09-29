@@ -48,12 +48,14 @@
   **没有 zone / DNS 权限** → 即便接受，在那个账号里也**挂不了自定义域名**（这正是「无法创建域名」的另一个可能来源）。
   域名 `002038.xyz` 的 zone 在 `Fzqcloud@outlook.com's Account`（539135b7…）下 ——
   **Cloudflare 的自定义域名必须与 Worker 同账号**，跨账号做不到。
-- **换账号已铺好（2026-09-29 用户：「我要换一下账号，不用 fqz 了」）**：`scripts/lib/account.mjs` 统一解析目标账号
-  （`CLOUDFLARE_ACCOUNT_ID` → 本机 `.env.deploy` 的 `ACCOUNT_ID` → 空=登录默认账号），`ci-deploy` / `migrate` / `init-secrets`
-  三个脚本都通过它注入环境变量 —— 换账号只改 `.env.deploy` 一处（仓库保持通用）。实测：不带该值时行为与之前完全一致；
-  带 `ACCOUNT_ID=738bff0c…` 时日志会打「目标账号：…」并切过去。
-  ⚠️ 但换到 `czjing` 的**两个前置条件都还没满足**：① 邀请仍是 `pending`（只能用户本人接受，API 403）；
-  ② 那条邀请**只授权单个 Worker**，没有 D1/KV/R2、也没有 zone —— 现状下即使接受也只能起一个连不上库的 Worker。
+- **OAuth 登录在这台机器上不稳 → 一律走 API Token**（2026-09-29 实测）：`wrangler login` 的回调服务只绑
+  **IPv6 `::1`**（`127.0.0.1:8976` 连不上、浏览器走 IPv4 或被代理拦 → 用户看到 `localhost 拒绝连接`），
+  且多次尝试会**残留进程占着 8976**（新进程抢不到端口），最终 `Timed out waiting for authorization code`。
+  改用目标账号创建的 **API Token**：写进本机 `.env.deploy` 的 `CLOUDFLARE_API_TOKEN`（可选 `CLOUDFLARE_ACCOUNT_ID`），
+  `scripts/lib/deploy-target.mjs` 统一读取，`ci-deploy.mjs` / `migrate.mjs` / `init-secrets.mjs` 都会透给 wrangler ——
+  不走浏览器回调、也**不覆盖**现有 OAuth 登录态（fzqcloud 那套线上站仍可管理）。
+  ⚠️ 若一定要 `wrangler login`：必须作为**独立进程**跑（`Start-Process` + 日志落盘），后台化/被取消的会被杀掉。
+  2026-09-29 凭据备份在 `<wrangler config>/default.toml.bak-20260929-211323`（切账号后可换回）。
 - **密钥一条命令搞定：`npm run secrets:init`**（`scripts/init-secrets.mjs`，2026-09-29）：缺哪个补哪个 ——
   随机生成 `SESSION_SECRET` / `STUDENT_SESSION_SECRET`（base64url 32B）与 `RECOVERY_TOKEN`（`kc-<18 hex>`，短好手输），
   用**推导出的 Worker 名**写入（`--name` → `WORKER_NAME` → `.env.deploy` → 配置默认名），然后**打印出来**并写进本机 `.env`。
