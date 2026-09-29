@@ -48,6 +48,12 @@
   **没有 zone / DNS 权限** → 即便接受，在那个账号里也**挂不了自定义域名**（这正是「无法创建域名」的另一个可能来源）。
   域名 `002038.xyz` 的 zone 在 `Fzqcloud@outlook.com's Account`（539135b7…）下 ——
   **Cloudflare 的自定义域名必须与 Worker 同账号**，跨账号做不到。
+- **换账号已铺好（2026-09-29 用户：「我要换一下账号，不用 fqz 了」）**：`scripts/lib/account.mjs` 统一解析目标账号
+  （`CLOUDFLARE_ACCOUNT_ID` → 本机 `.env.deploy` 的 `ACCOUNT_ID` → 空=登录默认账号），`ci-deploy` / `migrate` / `init-secrets`
+  三个脚本都通过它注入环境变量 —— 换账号只改 `.env.deploy` 一处（仓库保持通用）。实测：不带该值时行为与之前完全一致；
+  带 `ACCOUNT_ID=738bff0c…` 时日志会打「目标账号：…」并切过去。
+  ⚠️ 但换到 `czjing` 的**两个前置条件都还没满足**：① 邀请仍是 `pending`（只能用户本人接受，API 403）；
+  ② 那条邀请**只授权单个 Worker**，没有 D1/KV/R2、也没有 zone —— 现状下即使接受也只能起一个连不上库的 Worker。
 - **密钥一条命令搞定：`npm run secrets:init`**（`scripts/init-secrets.mjs`，2026-09-29）：缺哪个补哪个 ——
   随机生成 `SESSION_SECRET` / `STUDENT_SESSION_SECRET`（base64url 32B）与 `RECOVERY_TOKEN`（`kc-<18 hex>`，短好手输），
   用**推导出的 Worker 名**写入（`--name` → `WORKER_NAME` → `.env.deploy` → 配置默认名），然后**打印出来**并写进本机 `.env`。
