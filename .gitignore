@@ -1,0 +1,50 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 本地开发与自检脚本重定向出来的日志（wrangler dev、smoke-api.ps1 等）——
+# 纯本机运行产物，不参与构建也不该进仓库。
+dev.out
+dev.err
+dev-server.out
+dev-server.err
+.codebuddy/*.out
+.codebuddy/*.err
+
+# scripts/ci-deploy.mjs 生成的「无 R2」临时配置（部署完即删，这里只是兜底）
+wrangler.ci-no-r2.toml
+
+# scripts/pages-deploy.mjs 生成的 Pages 临时配置（含本机 .env.deploy 注入的账号信息）
+wrangler.pages.local.toml
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Cloudflare Workers / Wrangler
+.wrangler
+.dev.vars
+.dev.vars.*
+*.log
+
+# 本地环境变量台账（真实密钥，绝不入库）；需要模板就提交 .env.example
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
