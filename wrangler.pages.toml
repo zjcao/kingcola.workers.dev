@@ -37,3 +37,5 @@ bucket_name = "kingcola-files"
 ALLOWED_ORIGINS = ""
 SSO_AUTHORIZE_BASE = ""
 SSO_CLIENT_ID = "kingcola"
+# 「是否已安装」的初始标志（由构建/部署创建）；真正的状态在 D1（有没有管理员）
+INSTALL_STATE = "uninstalled"

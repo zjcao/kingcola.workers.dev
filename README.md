@@ -73,17 +73,21 @@ npm run dev
 
 ### 首次使用需要初始化管理员
 
-本地 D1 是空的，需要先创建管理员账号（只会成功一次），并可选写入演示内容：
+本地 D1 是空的，先创建管理员账号（只会成功一次），并可选写入演示内容：
+
+**推荐：打开 <http://127.0.0.1:8787/install>** —— 填管理员用户名 + 密码即可；
+建表、生成签名密钥都由应用自己完成（密钥写进本地 D1 的 `app_secrets`）。
+
+也可以敲命令（不再需要任何口令）：
 
 ```bash
 curl -X POST http://127.0.0.1:8787/api/admin/bootstrap \
   -H 'content-type: application/json' \
-  -d '{"token":"dev-recovery-token-please-change","username":"admin","password":"kingcola-dev-2026","seedContent":true}'
+  -d '{"username":"admin","password":"kingcola-dev-2026","seedContent":true}'
 ```
 
-- `token` 取 `.dev.vars` 里的 `RECOVERY_TOKEN`（默认值见上方命令）
 - 也可以登录后在「概览 → 写入演示数据」补内容
-- 忘记密码时用同一条命令、不带 `seedContent` 即可重置
+- 已安装后再调这个接口会被拒绝；改密码请在登录后自行修改
 
 ### 本地自检脚本
 
@@ -152,7 +156,7 @@ id = "你的命名空间 ID"              # 不填 = 首次部署自动创建
 |---|---|
 | `SESSION_SECRET` | 管理员会话签名 |
 | `STUDENT_SESSION_SECRET` | 报名学生会话签名（与管理员各自独立） |
-| `RECOVERY_TOKEN` | 初始化管理员 / 重置密码的灾备口令 |
+| ~~`RECOVERY_TOKEN`~~ | **已废弃**：安装与建管理员改由 `/install` 页面完成，不再需要任何口令 |
 | `QR_SIGN_SECRET` | 校验授权服务器签发的身份凭证（**须与其 `APPLY_TOKEN_SECRET` 一致**） |
 | `SSO_CLIENT_SECRET` | 向授权服务器换取身份的客户端凭据（**须与其同名变量一致**） |
 | `SMTP_PASSWORD` | 邮件通知的 SMTP 密码 / 授权码（未启用邮件可不填） |

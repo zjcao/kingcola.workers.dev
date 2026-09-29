@@ -13,6 +13,7 @@ import { Footer } from '@/sections/Footer'
 import { CHECKIN_PATH } from '@shared/recruit'
 import { Toaster } from '@/components/ui/sonner'
 import { AdminApp } from '@/admin/AdminApp'
+import { InstallPage } from '@/pages/InstallPage'
 import { refreshRuntimeConfig } from '@/api/client'
 import { useSiteData } from '@/api/hooks'
 import { GRADUATE_PATH, INVITE_PATH, PAGE_LABELS, PAGE_PATHS, type PageKey } from '@/types'
@@ -138,6 +139,8 @@ export default function App() {
 
   return (
     <Routes>
+      {/* 安装页：一个页面完成建表 + 生成密钥 + 建管理员；装完自动锁死 */}
+      <Route path="/install" element={<InstallPage />} />
       <Route path="/admin/*" element={<AdminApp />} />
       <Route path="/*" element={<PublicSite />} />
     </Routes>
