@@ -56,6 +56,14 @@
   不走浏览器回调、也**不覆盖**现有 OAuth 登录态（fzqcloud 那套线上站仍可管理）。
   ⚠️ 若一定要 `wrangler login`：必须作为**独立进程**跑（`Start-Process` + 日志落盘），后台化/被取消的会被杀掉。
   2026-09-29 凭据备份在 `<wrangler config>/default.toml.bak-20260929-211323`（切账号后可换回）。
+- ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
+  `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
+  ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
+  ② `workers_dev = false`（**至今仍在** ✗）。两行叠在一起的后果是「不绑域名 + 也不给 workers.dev」——
+  任何人（包括换账号后的自己）部署完线上**没有任何入口**，连"先用 workers.dev 顶着"都做不到。
+  正确做法：仓库只留通用默认（`workers_dev` 干脆不写 = 谁部署谁有个 workers.dev 地址），
+  要关的人自己在本地改；账号 / Worker 名 / Token 这类差异一律放本机 `.env.deploy`（gitignore）
+  —— `scripts/lib/deploy-target.mjs` 就是这么做的 ✓。**动 `wrangler.toml` 前先问用户**（上次就是这么出问题的）。
 - **密钥一条命令搞定：`npm run secrets:init`**（`scripts/init-secrets.mjs`，2026-09-29）：缺哪个补哪个 ——
   随机生成 `SESSION_SECRET` / `STUDENT_SESSION_SECRET`（base64url 32B）与 `RECOVERY_TOKEN`（`kc-<18 hex>`，短好手输），
   用**推导出的 Worker 名**写入（`--name` → `WORKER_NAME` → `.env.deploy` → 配置默认名），然后**打印出来**并写进本机 `.env`。
