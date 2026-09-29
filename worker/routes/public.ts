@@ -19,6 +19,7 @@ import { getRecruitSettings } from '../lib/recruit-config'
 import { getSiteConfig, listEntities } from '../lib/repo'
 import type { RequestContext } from '../lib/router'
 import { getStorageConfig, targetReady } from '../lib/storage'
+import { ssoClientSecretOf } from '../lib/sso-config'
 import { resolveRuntimeConfig } from './config'
 
 /** 公开内容缓存 30 秒：后台改完内容最迟 30 秒内全球生效，同时挡住绝大部分重复请求 */
@@ -98,7 +99,8 @@ export async function health(ctx: RequestContext): Promise<Response> {
       // 这里不再报告某个具体绑定，避免「没配 R2 但配了 S3」时被误判为未接通
       adminSecret: Boolean(ctx.env.SESSION_SECRET),
       studentSecret: Boolean(ctx.env.STUDENT_SESSION_SECRET),
-      ssoClientSecret: Boolean(ctx.env.SSO_CLIENT_SECRET),
+      // 客户端密钥现在以后台填写为准（加密存 D1），环境变量只作兜底，两者都算「有」
+      ssoClientSecret: Boolean(ssoClientSecretOf(ctx.env, runtime.sso)),
       qrSignSecret: Boolean(ctx.env.QR_SIGN_SECRET),
       // 「是否已安装」不在这里报：它要查 D1，而 health 是同步拼装的轻接口。
       // 安装页用 `/api/config/runtime` 的 `initialized`（表还没建时它会报错 = 未安装）判断。

@@ -305,6 +305,8 @@ export interface AdminConfigResponse {
   runtime: RuntimeConfig
   /** SMTP 密码来自哪里（密码本身永不下发，只告知有没有、在哪） */
   mailPasswordSource: 'database' | 'env' | 'none'
+  /** 教务网登录的客户端密钥来自哪里（密钥本身永不下发） */
+  ssoClientSecretSource: 'database' | 'env' | 'none'
 }
 
 export function adminGetConfig() {
@@ -317,6 +319,8 @@ export function adminUpdateConfig(patch: { site?: Partial<SiteConfig>; runtime?:
     runtime: RuntimeConfig | null
     /** 保存后 SMTP 密码的来源（数据库 / 环境变量 / 未设置） */
     mailPasswordSource?: 'database' | 'env' | 'none'
+    /** 保存后 SSO 客户端密钥的来源 */
+    ssoClientSecretSource?: 'database' | 'env' | 'none'
   }>('/api/admin/config', jsonInit('PUT', patch))
 }
 

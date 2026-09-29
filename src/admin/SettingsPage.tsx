@@ -29,6 +29,13 @@ const MAIL_PASSWORD_HINT: Record<'database' | 'env' | 'none', string> = {
   none: '尚未设置密码 —— 需要认证的服务器会发送失败',
 }
 
+/** 教务网登录的客户端密钥同理（来源不同，提示不同） */
+const SSO_SECRET_HINT: Record<'database' | 'env' | 'none', string> = {
+  database: '密钥已保存在数据库中（加密存储，任何接口都不会回显）',
+  env: '当前用的是服务端环境变量 SSO_CLIENT_SECRET；在上面填写即可改为保存在数据库',
+  none: '尚未设置客户端密钥 —— 回调换身份会失败',
+}
+
 /** 带标签 + 提示的输入项 */
 function Field({
   label,
@@ -58,6 +65,10 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
   const [mailPasswordSource, setMailPasswordSource] = useState<'database' | 'env' | 'none'>('none')
   const [mailPassword, setMailPassword] = useState('')
   const [clearMailPassword, setClearMailPassword] = useState(false)
+
+  const [ssoClientSecretSource, setSsoClientSecretSource] = useState<'database' | 'env' | 'none'>('none')
+  const [ssoClientSecret, setSsoClientSecret] = useState('')
+  const [clearSsoSecret, setClearSsoSecret] = useState(false)
   const [testTo, setTestTo] = useState('')
   const [sendingTest, setSendingTest] = useState(false)
 
@@ -74,6 +85,7 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
         setSite(response.site)
         setRuntime(response.runtime)
         setMailPasswordSource(response.mailPasswordSource)
+        setSsoClientSecretSource(response.ssoClientSecretSource)
       })
       .catch((error) => toast.error(error instanceof ApiError ? error.message : '加载配置失败'))
       .finally(() => active && setLoading(false))
@@ -102,16 +114,31 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
     }
   }
 
-  /** 流量通道与邮件配置共用同一个保存入口（两者都在 runtime 里） */
-  const saveRuntime = async (
-    title = '流量通道已生效',
-    description = '新通道最迟 1 分钟内对全部访客生效，存量页面会在下次刷新配置时切换',
-  ) => {
+  /**
+   * 教务网登录保存：客户端密钥与邮件密码同一套「不改 / 改 / 清除」语义 ——
+   * 后台永远拿不到原值，所以不带 clientSecret 键就是不修改。
+   */
+  const saveSso = async () => {
+    const nextSso = { ...runtime.sso }
+    delete nextSso.clientSecret
+    if (clearSsoSecret) nextSso.clientSecret = ''
+    else if (ssoClientSecret.trim()) nextSso.clientSecret = ssoClientSecret.trim()
+
     setSavingRuntime(true)
     try {
-      const response = await adminUpdateConfig({ runtime })
+      const response = await adminUpdateConfig({ runtime: { sso: nextSso } })
       if (response.runtime) setRuntime(response.runtime)
-      toast.success(title, { description })
+      if (response.ssoClientSecretSource) setSsoClientSecretSource(response.ssoClientSecretSource)
+      const changedSecret = Boolean(ssoClientSecret.trim())
+      setSsoClientSecret('')
+      setClearSsoSecret(false)
+      toast.success('教务网登录配置已保存', {
+        description: clearSsoSecret
+          ? '已清除数据库中的客户端密钥'
+          : changedSecret
+            ? '客户端密钥已加密保存到数据库'
+            : '最迟 1 分钟内对全部访客生效',
+      })
       refreshRuntimeConfig()
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : '保存失败')
@@ -407,7 +434,8 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
         {/* ===== 流量通道 ===== */}
         <TabsContent value="channel" className="mt-5 rounded-2xl border border-border bg-card p-5 sm:p-6">
           <p className="text-sm text-muted-foreground">
-            教务网登录的开关与授权服务器地址在这里维护，保存后官网立即生效；
+            教务网登录的开关、授权服务器地址、回调地址与客户端密钥都在这里维护，保存后官网立即生效，
+            不必改环境变量、也不必重新部署；
             文件存储（站点图片 / 报名表桶）已移至「对象存储」页面
           </p>
 
@@ -457,11 +485,80 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
                 </p>
               </div>
 
+              <div className="mt-4 grid gap-1.5">
+                <Label className="text-xs">回调地址</Label>
+                <Input
+                  value={runtime.sso.redirectUri}
+                  onChange={(e) =>
+                    setRuntime({ ...runtime, sso: { ...runtime.sso, redirectUri: e.target.value } })
+                  }
+                  placeholder="https://sso.example.cn/api/auth/callback"
+                />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  留空则按当前访问域名推导（本地调试够用）；线上建议固定下来，
+                  且必须与授权服务器白名单里的登记值逐字一致（含协议、域名、路径）。
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-1.5">
+                <Label className="text-xs">客户端密钥</Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={ssoClientSecret}
+                  onChange={(e) => {
+                    setSsoClientSecret(e.target.value)
+                    setClearSsoSecret(false)
+                  }}
+                  disabled={clearSsoSecret}
+                  placeholder={
+                    ssoClientSecretSource === 'none' ? '尚未设置' : '已保存 —— 留空表示不修改'
+                  }
+                />
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                  <span
+                    className={cn(
+                      clearSsoSecret || ssoClientSecretSource === 'none'
+                        ? 'text-amber-600'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {clearSsoSecret
+                      ? '保存后将清除数据库中的密钥'
+                      : SSO_SECRET_HINT[ssoClientSecretSource]}
+                  </span>
+                  {clearSsoSecret ? (
+                    <button
+                      type="button"
+                      className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                      onClick={() => setClearSsoSecret(false)}
+                    >
+                      取消清除
+                    </button>
+                  ) : (
+                    ssoClientSecretSource === 'database' && (
+                      <button
+                        type="button"
+                        className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                        onClick={() => {
+                          setSsoClientSecret('')
+                          setClearSsoSecret(true)
+                        }}
+                      >
+                        清除已保存的密钥
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+
               <p className="mt-4 border-t border-border pt-3 text-[11px] leading-relaxed text-muted-foreground">
-                授权服务器部署在国内 EdgeOne（另一个仓库维护）。这里的地址必须与服务端登记一致；
-                客户端密钥 <code className="rounded bg-secondary px-1">SSO_CLIENT_SECRET</code> 与回调地址{' '}
-                <code className="rounded bg-secondary px-1">SSO_REDIRECT_URI</code> 属于敏感配置，
-                仍由服务端环境变量管理，不在后台填写。
+                授权服务器部署在国内 EdgeOne（另一个仓库维护）。上面三项都在这里维护、保存后立即生效：
+                地址与回调地址必须与其登记值逐字一致；客户端密钥加密保存在数据库里，任何接口都不会回显
+                （填一次即可，留空表示不修改）。服务端环境变量{' '}
+                <code className="rounded bg-secondary px-1">SSO_CLIENT_SECRET</code> /{' '}
+                <code className="rounded bg-secondary px-1">SSO_REDIRECT_URI</code>{' '}
+                只是老部署的兜底，后台填过以后一律以后台为准。
               </p>
             </div>
 
@@ -472,8 +569,8 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
           </div>
 
           <div className="mt-6 flex justify-end border-t border-border pt-4">
-            <Button onClick={() => void saveRuntime()} disabled={savingRuntime} className="gap-1.5">
-              <ArrowLeftRight className="h-4 w-4" /> {savingRuntime ? '切换中…' : '保存并生效'}
+            <Button onClick={() => void saveSso()} disabled={savingRuntime} className="gap-1.5">
+              <ArrowLeftRight className="h-4 w-4" /> {savingRuntime ? '保存中…' : '保存并生效'}
             </Button>
           </div>
         </TabsContent>

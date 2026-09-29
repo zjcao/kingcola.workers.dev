@@ -35,6 +35,7 @@ import {
   readStudentSession,
   studentCookie,
 } from '../lib/student-auth'
+import { ssoClientSecretOf, ssoRedirectUriOf } from '../lib/sso-config'
 import { resolveRuntimeConfig } from './config'
 
 /** 凭证验签密钥，需与授权服务器共用 */
@@ -42,28 +43,34 @@ function tokenSecret(env: Env): string {
   return env.QR_SIGN_SECRET ?? 'kingcola-dev-insecure-qr-sign-secret-change-me'
 }
 
-/**
- * 取授权服务器地址 —— 以后台设置为准（存在 D1），环境变量仅作老部署的引导值。
- * 未接通（开关关掉或地址为空）时返回空串，调用方一律回首页提示。
- */
-async function idpBase(ctx: RequestContext): Promise<string> {
-  const runtime = await resolveRuntimeConfig(ctx)
-  if (!isSsoReady(runtime.sso)) return ''
-  return runtime.sso.authorizeBase.trim().replace(/\/+$/, '')
-}
-
+/** 主站在授权服务器处的注册标识：环境变量可选，缺省用内置默认值 */
 function clientId(env: Env): string {
   return (env.SSO_CLIENT_ID ?? '').trim() || SSO_CLIENT_ID
 }
 
+interface SsoContext {
+  /** 授权服务器基址；未接通（开关关掉或地址为空）时为空串 */
+  base: string
+  clientId: string
+  /** 回调地址：后台设置 → 环境变量 → 按当前访问域名推导 */
+  redirectUri: string
+  /** 客户端密钥：后台设置（已解密）→ 环境变量兜底 */
+  clientSecret: string
+}
+
 /**
- * 回调地址必须与授权服务器白名单里的登记值逐字一致。
- * 生产环境建议用 SSO_REDIRECT_URI 固定下来，避免自定义域名与预览域名不一致；
- * 留空时按当前访问域名推导，方便本地调试。
+ * 一次登录要用到的四样东西**统一在这里取**：
+ * 以后台设置为准（存在 D1），环境变量只作老部署的兜底 ——
+ * 这样即便有人在后台改了地址或密钥，也不必重新部署就能生效。
  */
-function callbackUrl(ctx: RequestContext): string {
-  const fixed = (ctx.env.SSO_REDIRECT_URI ?? '').trim()
-  return fixed || new URL('/api/auth/callback', ctx.url.origin).toString()
+async function ssoContext(ctx: RequestContext): Promise<SsoContext> {
+  const runtime = await resolveRuntimeConfig(ctx)
+  return {
+    base: isSsoReady(runtime.sso) ? runtime.sso.authorizeBase.trim().replace(/\/+$/, '') : '',
+    clientId: clientId(ctx.env),
+    redirectUri: ssoRedirectUriOf(ctx.env, runtime.sso, ctx.url.origin),
+    clientSecret: ssoClientSecretOf(ctx.env, runtime.sso),
+  }
 }
 
 function clearStateCookie(): string {
@@ -82,14 +89,14 @@ function backToHome(origin: string, reason: string): Response {
 
 /** 发起登录：种 state 后跳走 */
 export async function ssoLogin(ctx: RequestContext): Promise<Response> {
-  const base = await idpBase(ctx)
+  const { base, clientId: id, redirectUri } = await ssoContext(ctx)
   // 这是整页跳转的入口，出错也回首页说明，不把 JSON 错误页甩给用户
   if (!base) return backToHome(ctx.url.origin, 'not_configured')
 
   const state = randomHex(16)
   const target = buildAuthorizeUrl(base, {
-    clientId: clientId(ctx.env),
-    redirectUri: callbackUrl(ctx),
+    clientId: id,
+    redirectUri,
     state,
   })
 
@@ -120,18 +127,15 @@ export async function ssoCallback(ctx: RequestContext): Promise<Response> {
   // state 必须与本机种下的 cookie 一致，挡住伪造的回调
   if (!state || !expected || state !== expected) return backToHome(origin, 'state_mismatch')
 
-  const base = await idpBase(ctx)
-  if (!base) return backToHome(origin, 'not_configured')
-
-  const clientSecret = (ctx.env.SSO_CLIENT_SECRET ?? '').trim()
-  if (!clientSecret) return backToHome(origin, 'not_configured')
+  const { base, clientId: id, clientSecret } = await ssoContext(ctx)
+  if (!base || !clientSecret) return backToHome(origin, 'not_configured')
 
   let tokenResponse: Response
   try {
     tokenResponse = await fetch(idpTokenUrl(base), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code, clientId: clientId(ctx.env), clientSecret }),
+      body: JSON.stringify({ code, clientId: id, clientSecret }),
     })
   } catch {
     return backToHome(origin, 'upstream_unreachable')

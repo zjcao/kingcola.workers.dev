@@ -16,13 +16,16 @@ export interface Env {
   /** 允许跨域的来源，逗号分隔；同源部署时留空 */
   ALLOWED_ORIGINS?: string
 
-  /** 授权服务器基址，指向部署在国内 EdgeOne 的教务网登录服务 */
+  /** 授权服务器基址（可选兜底：后台「系统设置 → 流量通道」填过就以后台为准） */
   SSO_AUTHORIZE_BASE?: string
   /** 主站在授权服务器处的注册标识，需与其客户端白名单一致 */
   SSO_CLIENT_ID?: string
-  /** 与授权服务器约定的客户端密钥，只走服务端（wrangler secret put SSO_CLIENT_SECRET） */
+  /**
+   * 与授权服务器约定的客户端密钥。
+   * **正常在后台填写**（加密存 D1、接口不回显）；这里仅作老部署的兜底。
+   */
   SSO_CLIENT_SECRET?: string
-  /** 回调地址；留空时按访问域名自动推导 */
+  /** 回调地址（可选兜底：后台填过就以后台为准）；两处都没有时按访问域名自动推导 */
   SSO_REDIRECT_URI?: string
 
   /** SMTP 登录密码 / 授权码，只走服务端（wrangler secret put SMTP_PASSWORD） */

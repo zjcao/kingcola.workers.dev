@@ -7,9 +7,11 @@
 //   npm run secrets:init -- --show    # 只显示 .env 里现在的值，不改也不写
 //
 // 分两类：
-//   · 自己用的（SESSION_SECRET / STUDENT_SESSION_SECRET / RECOVERY_TOKEN）→ 随机生成
+//   · 自己用的（SESSION_SECRET / STUDENT_SESSION_SECRET）→ 随机生成
 //   · 必须与「别人」一致的（SSO_CLIENT_SECRET / QR_SIGN_SECRET 对授权服务器，
 //     SMTP_PASSWORD 对邮箱服务商）→ **不会瞎生成**，只提示你去填
+//     （其中 SSO_CLIENT_SECRET 与 SMTP_PASSWORD 也可以直接在后台填，加密存 D1；
+//     后台填过就以后台为准，这里只是兜底 —— 见 README「写入密钥」一节）
 //
 // 两个关键细节（都是踩过的坑）：
 //   1. 写入时必须带 `--name <面板项目名>` —— wrangler 的 secret 命令默认取 wrangler.toml 里的
@@ -53,7 +55,10 @@ const GENERATED = [
 
 /** 必须与「别人」一致的密钥：脚本不生成，只提示 */
 const EXTERNAL = [
-  { key: 'SSO_CLIENT_SECRET', note: '须与授权服务器上的同名变量逐字一致' },
+  {
+    key: 'SSO_CLIENT_SECRET',
+    note: '须与授权服务器上的同名变量逐字一致；也可直接填在后台「系统设置 → 流量通道」（推荐），这里只是兜底',
+  },
   { key: 'QR_SIGN_SECRET', note: '须与授权服务器上的 APPLY_TOKEN_SECRET 逐字一致' },
   { key: 'SMTP_PASSWORD', note: '邮箱服务商后台生成的授权码，只有你知道' },
 ]
