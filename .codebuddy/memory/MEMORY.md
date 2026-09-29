@@ -55,7 +55,9 @@
   `scripts/lib/deploy-target.mjs` 统一读取，`ci-deploy.mjs` / `migrate.mjs` / `init-secrets.mjs` 都会透给 wrangler ——
   不走浏览器回调、也**不覆盖**现有 OAuth 登录态（fzqcloud 那套线上站仍可管理）。
   ⚠️ 若一定要 `wrangler login`：必须作为**独立进程**跑（`Start-Process` + 日志落盘），后台化/被取消的会被杀掉。
-  2026-09-29 凭据备份在 `<wrangler config>/default.toml.bak-20260929-211323`（切账号后可换回）。
+  ⚠️ **用户 2026-09-29 明确要求：不要给他备份凭据，并清空所有 wrangler 登录** ——
+  以后再处理账号/凭据类操作时，**不要**顺手复制 token / 配置文件留备份（`wrangler logout` 已执行、备份已删）。
+  需要操作 Cloudflare 时改为让用户提供 API Token（写进本机 `.env.deploy`）或由用户自己重新登录。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
