@@ -35,6 +35,12 @@
     （改完 health 三项 true、bootstrap/login 实测 200）；
     `SMTP_PASSWORD` / `SSO_CLIENT_SECRET` / `QR_SIGN_SECRET` **保持注释**（占位符若被 bulk 上去会把线上写坏）——填好后取消注释再 bulk 一次。
     本地 `wrangler dev` 读的仍是 `.dev.vars`（另一套联调值，别混）；前端不用 Vite 环境变量（无 `import.meta.env`），`.env` 不影响构建。
+  - ✅ **2026-09-29 起，教务网登录的「地址 / 回调地址 / 客户端密钥」与「SMTP 密码」全部改成在后台填**（用户要求）：
+    加密存 D1 的 `site_config['runtime']`，环境变量（`SSO_AUTHORIZE_BASE` / `SSO_REDIRECT_URI` / `SSO_CLIENT_SECRET` /
+    `SMTP_PASSWORD`）退为兜底 —— 日常改配置去后台，不必再改环境变量或重新部署。只有 `QR_SIGN_SECRET` 仍必须在环境变量里。
+  - ⚠️ **保存运行时配置时，基线必须取「未解密」的那份**（`resolveStoredRuntimeConfig()`）：
+    拿 `resolveRuntimeConfig()` 解密后的明文当基线再落库，会把库里的 `enc$` 密文**悄悄降级成明文**
+    （首次保存正常，第二次「留空不修改」就中招 —— 2026-09-29 本地实测抓到，SMTP 密码流程同样受影响）。
     ⚠️ **`wrangler secret` 系列命令默认取 `wrangler.toml` 的 `name`（现在是通用名 `kingcola`）**：必须带
     `--name <面板项目名>`，否则密钥会写到 —— 甚至**新建**出 —— 另一个 Worker（本项目就误建过一个 `kingcola`，
     表现为 `-home2` 上「密钥写不进去」）。正确写法：`npx wrangler secret bulk .env --name kingcola-icg-home2`；
