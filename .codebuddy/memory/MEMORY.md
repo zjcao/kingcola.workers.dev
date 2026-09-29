@@ -125,8 +125,14 @@
   ② `worker/lib/secrets.ts` 生成 `SESSION_SECRET` / `STUDENT_SESSION_SECRET` 写进 D1 的 `app_secrets`（迁移 `0013`）✓
   ③ 建第一个管理员。取密钥改为「D1 优先、环境变量兜底」：`secretOf()` + 每个请求入口 `worker/index.ts` 里
   `await warmSecrets(env)`（实例级缓存 ✓）。`RECOVERY_TOKEN` 已从 env/`.env`/`init-secrets` 移除 ✓。
-  ⚠️ 仍待办：`/install` 独立页面与路由（当前先用登录页的「首次初始化」引导 + `/api/config/runtime` 的 `initialized`
-  判断是否已安装；表未建时该接口报错即视为「未安装」）；README/HANDOVER 里的 RECOVERY_TOKEN 文案还没清。
+  ✅ 已完成：**`/install` 独立页面 + 路由**（`src/pages/InstallPage.tsx` + `src/App.tsx` 里 `<Route path="/install">`，
+  未装给表单、装完锁死；状态用 `/api/config/runtime` 的 `initialized`，该接口报错即视为未装）；
+  `wrangler.toml` / `wrangler.pages.toml` 都加了 `[vars] INSTALL_STATE = "uninstalled"`（构建创建的占位标志）；
+  README 的「本地首次使用」与密钥表已改成「打开 `/install` 安装」。
+  校验：`tsc -b` ✓、`eslint` ✓、`npm run build` ✓、已提交推送 ✓。
+  ⚠️ **文档里还剩几处旧文案没清**（README 的「部署 → 5. 初始化管理员」小节、HANDOVER 第 5 节
+  与第 7 节的 `RECOVERY_TOKEN` 恢复段）；⚠️ **端到端没跑过**（本机 `wrangler dev` + 本地 D1 走一遍
+  「打开 /install → 建表 → 建号 → 登录」），下次接着做。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
