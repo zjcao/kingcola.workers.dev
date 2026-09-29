@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "wrangler dev",
     "local": "npm run build && wrangler dev",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/gen-migrations.mjs && tsc -b && vite build",
     "deploy": "npm run build && node scripts/ci-deploy.mjs",
     "pages:deploy": "node scripts/pages-deploy.mjs",
     "typecheck": "tsc -b",
