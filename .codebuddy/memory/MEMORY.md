@@ -89,6 +89,14 @@
   台账逻辑在仓库里 ✓），或让管理员放宽 D1 权限后再由我们跑。
   ⚠️ `czjing` 的 workers.dev HTTPS 在国内被 **SNI 阻断**（实测 `curl: (35) Recv failure: Connection was reset`；纯 HTTP 才通）→
   **国内访问不了**。结论：这个 Worker 要「正常使用」，必须先解决①D1 迁移（对方权限）②域名（对方账号里要有 zone）。
+- 🌏 **`*.pages.dev` 在国内可达，`*.workers.dev` 不可达（2026-09-29 实测，用户「pages 国内可以正常访问」的判断正确）**：
+  同一时刻 `https://kingcola.pages.dev/` → **HTTP 200** ✓，而 `https://kingcola-pages-dev.zjcao.workers.dev/` → **超时** ✗。
+  ⚠️ 但 `kingcola.pages.dev` 上跑的是**另一份纯静态介绍页**（`KingCola · HNUST`，没有 API —— `/api/health` 返回的是同一个 HTML ✗），
+  **不是本站**；往同名 Pages 项目部署会**覆盖**它 ⚠️。
+  ⚠️ 我们对 `czjing` 的 Pages 接口 **403**（角色只有 Individual Workers…）→ 那边建/部署 Pages 只能对方做；
+  用户自己账号有 5 个 Pages 项目（vless3 / file-transfer / bilibili / vless / chat-pages）✓ 权限齐全 → 那里可立刻做成「国内可访问」。
+  要改成 Pages 的要点：`pages_build_output_dir = "./dist"` + `functions/[[path]].ts`（把 Worker 的 fetch 挂上去）
+  + `_routes.json`（等价于 `run_worker_first`，只让 `/api/*` 进 Function）+ 同样的 D1/KV/R2/密钥 + `wrangler pages deploy dist`。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
