@@ -97,6 +97,12 @@
   用户自己账号有 5 个 Pages 项目（vless3 / file-transfer / bilibili / vless / chat-pages）✓ 权限齐全 → 那里可立刻做成「国内可访问」。
   要改成 Pages 的要点：`pages_build_output_dir = "./dist"` + `functions/[[path]].ts`（把 Worker 的 fetch 挂上去）
   + `_routes.json`（等价于 `run_worker_first`，只让 `/api/*` 进 Function）+ 同样的 D1/KV/R2/密钥 + `wrangler pages deploy dist`。
+- 🚫 **用户硬约束（2026-09-29）：「不要用本机脚本操作 Cloudflare，建表必须由跑在 Cloudflare 上的东西完成」** ——
+  原话：「请确保你没有手动进行建表，也没有使用除了运行在 Cloudflare 上面以外的任何脚本」。
+  含义：**不要**在本机跑 `migrate.mjs` / `d1 execute` / `pages secret` / `wrangler deploy` 去动线上；
+  建表要么由**应用自己**在运行时完成（把 SQL 文本打包进产物、按 `_migrations` 台账执行），
+  要么由**面板里的 Git 构建**（Pages/Workers Builds，构建跑在 Cloudflare 上，需带 D1 权限的自定义 token）完成。
+  允许：`git` 提交推送、HTTP 请求观察状态、在用户明确点头时做账号级资源创建。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
