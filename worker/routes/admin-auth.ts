@@ -135,28 +135,34 @@ export async function changePassword(ctx: RequestContext): Promise<Response> {
 }
 
 /**
- * 初始化 / 重置管理员。需要 RECOVERY_TOKEN 环境变量，且必须用 HTTPS 调用。
- *  - 系统中没有管理员时：创建第一个管理员
- *  - 已有管理员时：把该用户名的密码重置为新密码（找回入口）
+ * **安装**：把表建好（打包进产物的迁移，按 `_migrations` 台账执行）+ 生成运行期密钥 + 创建第一个管理员。
+ *
+ * 不再需要任何 recovery 口令 —— 「系统里还没有管理员」本身就是授权的全部依据；
+ * 装完之后这个接口直接拒绝（重置密码请在登录后自行修改）。
  */
 export async function bootstrap(ctx: RequestContext): Promise<Response> {
-  const expected = ctx.env.RECOVERY_TOKEN
+  const { isInstalled, runPendingMigrations } = await import('../lib/migrate')
+  const { generateSecrets } = await import('../lib/secrets')
   const body = await readJsonBody<BootstrapBody>(ctx.request)
-  const token = body?.token?.trim() ?? ''
 
-  if (!expected) {
-    return fail(503, 'RECOVERY_DISABLED', '未配置 RECOVERY_TOKEN，无法执行初始化')
-  }
-  if (!token || token !== expected) {
-    await writeAudit(ctx.env, {
-      actor: '(recovery)',
-      action: 'bootstrap_denied',
-      ip: clientIp(ctx.request),
-      ua: ctx.request.headers.get('user-agent') ?? '',
-    })
-    return fail(403, 'INVALID_TOKEN', '恢复口令不正确')
+  if (await isInstalled(ctx.env)) {
+    return fail(
+      409,
+      'ALREADY_INSTALLED',
+      '已经安装过了：请直接登录；忘记密码请在登录后修改（或由另一位管理员重置）',
+    )
   }
 
+  // 1) 建表（应用自建表：SQL 随产物发布，台账保证只执行一次）
+  const migrated = await runPendingMigrations(ctx.env)
+  if (!migrated.ok) {
+    return fail(503, 'DB_NOT_READY', migrated.reason ?? '数据库未就绪')
+  }
+
+  // 2) 生成运行期密钥（SESSION_SECRET / STUDENT_SESSION_SECRET）→ 写进 D1，已存在的不动
+  await generateSecrets(ctx.env)
+
+  // 3) 建管理员
   const username = (body?.username?.trim() || ctx.env.BOOTSTRAP_USERNAME || 'admin').toLowerCase()
   const password = body?.password ?? ctx.env.BOOTSTRAP_PASSWORD ?? ''
   if (password.length < minPasswordLength()) {

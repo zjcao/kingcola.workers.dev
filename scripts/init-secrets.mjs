@@ -48,11 +48,7 @@ const GENERATED = [
     note: '报名学生会话签名（与上面各自独立）',
     make: () => randomBytes(32).toString('base64url'),
   },
-  {
-    key: 'RECOVERY_TOKEN',
-    note: '初始化管理员 / 重置密码的口令（要在页面上手输，所以做短一点）',
-    make: () => `kc-${randomBytes(9).toString('hex')}`,
-  },
+
 ]
 
 /** 必须与「别人」一致的密钥：脚本不生成，只提示 */

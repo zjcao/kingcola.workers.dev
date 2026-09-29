@@ -119,6 +119,14 @@
      **带 D1 Edit 的自定义 token**，否则构建只能建 KV/R2 ✗；
   ② 密钥改存 D1 后，`worker/lib/auth.ts` / `student-auth.ts` / `routes/sso.ts` 里**同步读 `env.SESSION_SECRET`** 的地方
      必须改成「从解析后的运行时配置读（异步 + 缓存）」，否则签名与验签会对不上。
+- 🛠 **安装流程已落地（2026-09-29）**：`POST /api/admin/bootstrap` 变成**安装接口**（不再要 recovery 口令，
+  只允许「还没有管理员」时调用 ✓）：① `worker/lib/migrate.ts` 按 `_migrations` 台账执行**打包进产物**的
+  `worker/migrations.generated.ts`（由 `scripts/gen-migrations.mjs` 在 `npm run build` 生成）→ 建表跑在 Cloudflare 上 ✓
+  ② `worker/lib/secrets.ts` 生成 `SESSION_SECRET` / `STUDENT_SESSION_SECRET` 写进 D1 的 `app_secrets`（迁移 `0013`）✓
+  ③ 建第一个管理员。取密钥改为「D1 优先、环境变量兜底」：`secretOf()` + 每个请求入口 `worker/index.ts` 里
+  `await warmSecrets(env)`（实例级缓存 ✓）。`RECOVERY_TOKEN` 已从 env/`.env`/`init-secrets` 移除 ✓。
+  ⚠️ 仍待办：`/install` 独立页面与路由（当前先用登录页的「首次初始化」引导 + `/api/config/runtime` 的 `initialized`
+  判断是否已安装；表未建时该接口报错即视为「未安装」）；README/HANDOVER 里的 RECOVERY_TOKEN 文案还没清。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）

@@ -34,8 +34,12 @@ export interface Env {
   STUDENT_SESSION_SECRET?: string
   /** applyToken 验签密钥，需与授权服务器一致（wrangler secret put QR_SIGN_SECRET） */
   QR_SIGN_SECRET?: string
-  /** 灾备/交接口令，用于创建第一个管理员或重置密码（wrangler secret put RECOVERY_TOKEN） */
-  RECOVERY_TOKEN?: string
+  /**
+   * 是否已安装的标志（由构建脚本写入初始值 `uninstalled`）。
+   * ⚠️ 运行期改不了环境变量，所以**真正的状态在 D1**（`admin_users` 有没有记录）；
+   * 这里只作为「首次部署的提示位」，安装页以 D1 为准。
+   */
+  INSTALL_STATE?: string
 
   /** 首次部署引导用的初始管理员账号（可选，建议改用 RECOVERY_TOKEN 引导） */
   BOOTSTRAP_USERNAME?: string

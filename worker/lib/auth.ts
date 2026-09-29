@@ -1,4 +1,5 @@
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, type Env } from '../env'
+import { secretOf } from './secrets'
 import { passwordVersion, signToken, verifyToken } from './crypto'
 import { parseCookies, serializeCookie } from './http'
 
@@ -20,7 +21,8 @@ export interface AdminRow {
 }
 
 function sessionSecret(env: Env): string {
-  return env.SESSION_SECRET ?? 'kingcola-dev-insecure-session-secret-change-me'
+  // D1 里由安装页生成的优先，环境变量兜底（本地开发/老部署）
+  return secretOf(env, 'SESSION_SECRET') || 'kingcola-dev-insecure-session-secret-change-me'
 }
 
 export async function issueSessionToken(env: Env, admin: AdminRow): Promise<string> {

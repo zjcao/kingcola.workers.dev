@@ -8,6 +8,7 @@
 import type { Env } from './env'
 import { readSession } from './lib/auth'
 import { fail, preflight, withCors } from './lib/http'
+import { warmSecrets } from './lib/secrets'
 import { matchRoute, type RequestContext, type RouteDef } from './lib/router'
 import { readStudentSession } from './lib/student-auth'
 import {
@@ -240,6 +241,8 @@ async function handle(request: Request, env: Env, exec: ExecutionContext): Promi
 
 export default {
   async fetch(request: Request, env: Env, exec: ExecutionContext): Promise<Response> {
+    // 安装页生成的运行期密钥存在 D1 里；同步取密钥的地方（会话签名/验签）靠这份缓存
+    await warmSecrets(env)
     const response = await handle(request, env, exec)
     return withCors(response, request, env)
   },

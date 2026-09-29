@@ -100,7 +100,8 @@ export async function health(ctx: RequestContext): Promise<Response> {
       studentSecret: Boolean(ctx.env.STUDENT_SESSION_SECRET),
       ssoClientSecret: Boolean(ctx.env.SSO_CLIENT_SECRET),
       qrSignSecret: Boolean(ctx.env.QR_SIGN_SECRET),
-      recoveryToken: Boolean(ctx.env.RECOVERY_TOKEN),
+      // 「是否已安装」不在这里报：它要查 D1，而 health 是同步拼装的轻接口。
+      // 安装页用 `/api/config/runtime` 的 `initialized`（表还没建时它会报错 = 未安装）判断。
     },
     elapsedMs: Date.now() - started,
   })

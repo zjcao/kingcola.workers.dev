@@ -10,6 +10,7 @@
  */
 
 import { STUDENT_SESSION_COOKIE, STUDENT_SESSION_TTL_SECONDS, type Env } from '../env'
+import { secretOf } from './secrets'
 import { signToken, verifyToken } from './crypto'
 import { parseCookies, serializeCookie } from './http'
 
@@ -23,7 +24,8 @@ export interface StudentSession {
 }
 
 function studentSecret(env: Env): string {
-  return env.STUDENT_SESSION_SECRET ?? 'kingcola-dev-insecure-student-secret-change-me'
+  // D1 里由安装页生成的优先，环境变量兜底
+  return secretOf(env, 'STUDENT_SESSION_SECRET') || 'kingcola-dev-insecure-student-secret-change-me'
 }
 
 export async function issueStudentToken(
