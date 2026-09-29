@@ -58,6 +58,14 @@
   ⚠️ **用户 2026-09-29 明确要求：不要给他备份凭据，并清空所有 wrangler 登录** ——
   以后再处理账号/凭据类操作时，**不要**顺手复制 token / 配置文件留备份（`wrangler logout` 已执行、备份已删）。
   需要操作 Cloudflare 时改为让用户提供 API Token（写进本机 `.env.deploy`）或由用户自己重新登录。
+- **2026-09-29 晚换账号（用户：「重新登录」）— `wrangler login` 这次成功了**：关键是**先清掉占着 8976 的残留进程**、
+  再用**单个独立进程**跑（`Start-Process` + 日志落盘），回调就通了。新登录身份 **`3343503027@qq.com`**，可见两个账号：
+  · **`czjing`（`738bff0cfc073b8d2647295f8016748b`）基本没权限** —— D1 / KV / R2 全部 `Authentication error`，
+    被授权的那个 Worker 也是 `No access to the specified resource` → **没法在它里面部署整套站**（本应用强依赖 D1）；
+  · **`3343503027@qq.com's Account`（`86c3d67ccc8a24f34dae7dcf7ff6e4ee`）权限完整可行** —— D1 ✓、KV ✓（已有 `vless3`）、
+    R2 未建桶（部署脚本会自动降级 ✓）、**有 3 个 zone**：`bilibili.fit` / `mcrem.top` / `mcserver.top`（都 active ✓）。
+  ⚠️ 旧账号 `fzqcloud` 的登录已按用户要求清空 → `kingcola.002038.xyz` 那套线上站**以后管不到**（站点本身仍在跑）。
+  ⚠️ 这份登录含两个账号 → wrangler 命令必须显式 `CLOUDFLARE_ACCOUNT_ID`，否则可能走错账号。
 - ⚠️ **绝不把「某次部署的选择」写进仓库配置**（2026-09-29 我自己的错，用户两次指出）：
   `wrangler.toml` 是仓库通用文件，不能出现只对某一次部署成立的设置。已犯两例，且**是同一个提交 `ad0b2d1` 里一起写进去的**：
   ① `[[routes]] custom_domain = "kingcola.002038.xyz"`（我的域名；已在 `e195675` 移除 ✓）
