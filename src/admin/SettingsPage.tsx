@@ -36,6 +36,13 @@ const SSO_SECRET_HINT: Record<'database' | 'env' | 'none', string> = {
   none: '尚未设置客户端密钥 —— 回调换身份会失败',
 }
 
+/** 凭证验签密钥（QR_SIGN_SECRET）：它必须与授权服务器的 APPLY_TOKEN_SECRET 一致 */
+const QR_SECRET_HINT: Record<'database' | 'env' | 'none', string> = {
+  database: '密钥已保存在数据库中（加密存储，任何接口都不会回显）',
+  env: '当前用的是服务端环境变量 QR_SIGN_SECRET；在上面填写即可改为保存在数据库',
+  none: '尚未设置 —— 换票会成功但验签必然失败（回调报 invalid_credential）',
+}
+
 /** 带标签 + 提示的输入项 */
 function Field({
   label,
@@ -69,6 +76,10 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
   const [ssoClientSecretSource, setSsoClientSecretSource] = useState<'database' | 'env' | 'none'>('none')
   const [ssoClientSecret, setSsoClientSecret] = useState('')
   const [clearSsoSecret, setClearSsoSecret] = useState(false)
+
+  const [qrSignSecretSource, setQrSignSecretSource] = useState<'database' | 'env' | 'none'>('none')
+  const [qrSignSecret, setQrSignSecret] = useState('')
+  const [clearQrSecret, setClearQrSecret] = useState(false)
   const [testTo, setTestTo] = useState('')
   const [sendingTest, setSendingTest] = useState(false)
 
@@ -86,6 +97,7 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
         setRuntime(response.runtime)
         setMailPasswordSource(response.mailPasswordSource)
         setSsoClientSecretSource(response.ssoClientSecretSource)
+        setQrSignSecretSource(response.qrSignSecretSource)
       })
       .catch((error) => toast.error(error instanceof ApiError ? error.message : '加载配置失败'))
       .finally(() => active && setLoading(false))
@@ -115,29 +127,37 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
   }
 
   /**
-   * 教务网登录保存：客户端密钥与邮件密码同一套「不改 / 改 / 清除」语义 ——
-   * 后台永远拿不到原值，所以不带 clientSecret 键就是不修改。
+   * 教务网登录保存：两把密钥与邮件密码同一套「不改 / 改 / 清除」语义 ——
+   * 后台永远拿不到原值，所以不带对应的键就是不修改。
    */
   const saveSso = async () => {
     const nextSso = { ...runtime.sso }
     delete nextSso.clientSecret
+    delete nextSso.qrSignSecret
     if (clearSsoSecret) nextSso.clientSecret = ''
     else if (ssoClientSecret.trim()) nextSso.clientSecret = ssoClientSecret.trim()
+    if (clearQrSecret) nextSso.qrSignSecret = ''
+    else if (qrSignSecret.trim()) nextSso.qrSignSecret = qrSignSecret.trim()
 
     setSavingRuntime(true)
     try {
       const response = await adminUpdateConfig({ runtime: { sso: nextSso } })
       if (response.runtime) setRuntime(response.runtime)
       if (response.ssoClientSecretSource) setSsoClientSecretSource(response.ssoClientSecretSource)
-      const changedSecret = Boolean(ssoClientSecret.trim())
+      if (response.qrSignSecretSource) setQrSignSecretSource(response.qrSignSecretSource)
+
+      const notes: string[] = []
+      if (clearSsoSecret) notes.push('客户端密钥已清除')
+      else if (ssoClientSecret.trim()) notes.push('客户端密钥已加密保存')
+      if (clearQrSecret) notes.push('验签密钥已清除')
+      else if (qrSignSecret.trim()) notes.push('验签密钥已加密保存')
+
       setSsoClientSecret('')
       setClearSsoSecret(false)
+      setQrSignSecret('')
+      setClearQrSecret(false)
       toast.success('教务网登录配置已保存', {
-        description: clearSsoSecret
-          ? '已清除数据库中的客户端密钥'
-          : changedSecret
-            ? '客户端密钥已加密保存到数据库'
-            : '最迟 1 分钟内对全部访客生效',
+        description: notes.length ? notes.join('；') : '密钥未改动，最迟 1 分钟内对全部访客生效',
       })
       refreshRuntimeConfig()
     } catch (error) {
@@ -552,11 +572,64 @@ export function SettingsPage({ identity }: { identity: AdminIdentity }) {
                 </div>
               </div>
 
+              <div className="mt-4 grid gap-1.5">
+                <Label className="text-xs">凭证验签密钥</Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={qrSignSecret}
+                  onChange={(e) => {
+                    setQrSignSecret(e.target.value)
+                    setClearQrSecret(false)
+                  }}
+                  disabled={clearQrSecret}
+                  placeholder={qrSignSecretSource === 'none' ? '尚未设置' : '已保存 —— 留空表示不修改'}
+                />
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                  <span
+                    className={cn(
+                      clearQrSecret || qrSignSecretSource === 'none'
+                        ? 'text-amber-600'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {clearQrSecret ? '保存后将清除数据库中的密钥' : QR_SECRET_HINT[qrSignSecretSource]}
+                  </span>
+                  {clearQrSecret ? (
+                    <button
+                      type="button"
+                      className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                      onClick={() => setClearQrSecret(false)}
+                    >
+                      取消清除
+                    </button>
+                  ) : (
+                    qrSignSecretSource === 'database' && (
+                      <button
+                        type="button"
+                        className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                        onClick={() => {
+                          setQrSignSecret('')
+                          setClearQrSecret(true)
+                        }}
+                      >
+                        清除已保存的密钥
+                      </button>
+                    )
+                  )}
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  必须与授权服务器的 <code className="rounded bg-secondary px-1">APPLY_TOKEN_SECRET</code>{' '}
+                  逐字一致 —— 不一致时换票成功、验签失败（回调报 invalid_credential）。
+                </p>
+              </div>
+
               <p className="mt-4 border-t border-border pt-3 text-[11px] leading-relaxed text-muted-foreground">
-                授权服务器部署在国内 EdgeOne（另一个仓库维护）。上面三项都在这里维护、保存后立即生效：
-                地址与回调地址必须与其登记值逐字一致；客户端密钥加密保存在数据库里，任何接口都不会回显
+                授权服务器部署在国内 EdgeOne（另一个仓库维护）。上面四项都在这里维护、保存后立即生效：
+                地址与回调地址必须与其登记值逐字一致；两把密钥加密保存在数据库里，任何接口都不会回显
                 （填一次即可，留空表示不修改）。服务端环境变量{' '}
                 <code className="rounded bg-secondary px-1">SSO_CLIENT_SECRET</code> /{' '}
+                <code className="rounded bg-secondary px-1">QR_SIGN_SECRET</code> /{' '}
                 <code className="rounded bg-secondary px-1">SSO_REDIRECT_URI</code>{' '}
                 只是老部署的兜底，后台填过以后一律以后台为准。
               </p>

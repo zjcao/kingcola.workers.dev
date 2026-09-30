@@ -307,6 +307,8 @@ export interface AdminConfigResponse {
   mailPasswordSource: 'database' | 'env' | 'none'
   /** 教务网登录的客户端密钥来自哪里（密钥本身永不下发） */
   ssoClientSecretSource: 'database' | 'env' | 'none'
+  /** 教务网登录的凭证验签密钥（QR_SIGN_SECRET）来自哪里 */
+  qrSignSecretSource: 'database' | 'env' | 'none'
 }
 
 export function adminGetConfig() {
@@ -321,6 +323,8 @@ export function adminUpdateConfig(patch: { site?: Partial<SiteConfig>; runtime?:
     mailPasswordSource?: 'database' | 'env' | 'none'
     /** 保存后 SSO 客户端密钥的来源 */
     ssoClientSecretSource?: 'database' | 'env' | 'none'
+    /** 保存后 SSO 凭证验签密钥的来源 */
+    qrSignSecretSource?: 'database' | 'env' | 'none'
   }>('/api/admin/config', jsonInit('PUT', patch))
 }
 

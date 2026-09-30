@@ -16,7 +16,7 @@ import { ok } from '../lib/http'
 import { countAdmins } from '../lib/auth'
 import { resolveMailPassword } from '../lib/mailer'
 import { getConfigValue, getSiteConfig } from '../lib/repo'
-import { resolveSsoClientSecret } from '../lib/sso-config'
+import { resolveQrSignSecret, resolveSsoClientSecret } from '../lib/sso-config'
 import type { RequestContext } from '../lib/router'
 
 const RUNTIME_CONFIG_KEY = 'runtime'
@@ -98,16 +98,17 @@ export async function resolveRuntimeConfig(ctx: RequestContext): Promise<Runtime
   const { env } = ctx
   const stored = await mergedRuntimeConfig(ctx)
 
-  // 密码与客户端密钥在内存里还原成明文，供 mailer / 登录流程使用；
+  // 密码与两把 SSO 密钥在内存里还原成明文，供 mailer / 登录与验签流程使用；
   // 下发前由 publicRuntimeConfig() 统一剥掉
-  const [password, clientSecret] = await Promise.all([
+  const [password, clientSecret, qrSignSecret] = await Promise.all([
     resolveMailPassword(env, stored.mail.password),
     resolveSsoClientSecret(env, stored.sso.clientSecret),
+    resolveQrSignSecret(env, stored.sso.qrSignSecret),
   ])
   return {
     ...stored,
     mail: { ...stored.mail, password },
-    sso: { ...stored.sso, clientSecret },
+    sso: { ...stored.sso, clientSecret, qrSignSecret },
   }
 }
 

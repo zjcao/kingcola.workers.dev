@@ -35,7 +35,10 @@ export interface Env {
   SESSION_SECRET?: string
   /** 报名学生会话签名密钥，与管理员各自独立（wrangler secret put STUDENT_SESSION_SECRET） */
   STUDENT_SESSION_SECRET?: string
-  /** applyToken 验签密钥，需与授权服务器一致（wrangler secret put QR_SIGN_SECRET） */
+  /**
+   * applyToken 验签密钥，须与授权服务器的 `APPLY_TOKEN_SECRET` 一致。
+   * **正常在后台填写**（加密存 D1、接口不回显）；这里仅作老部署的兜底。
+   */
   QR_SIGN_SECRET?: string
   /**
    * 是否已安装的标志（由构建脚本写入初始值 `uninstalled`）。

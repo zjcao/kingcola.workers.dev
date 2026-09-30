@@ -24,7 +24,12 @@ import {
 } from './config'
 import { getMemberRoles } from '../lib/identity-config'
 import { encryptMailPassword, mailPasswordSourceOf } from '../lib/mailer'
-import { encryptSsoClientSecret, ssoClientSecretSourceOf } from '../lib/sso-config'
+import {
+  encryptQrSignSecret,
+  encryptSsoClientSecret,
+  qrSignSecretSourceOf,
+  ssoClientSecretSourceOf,
+} from '../lib/sso-config'
 import { clientIp, fail, ok, readJsonBody } from '../lib/http'
 import {
   countEntities,
@@ -206,16 +211,51 @@ export async function getAdminConfig(ctx: RequestContext): Promise<Response> {
   const [site, runtime] = await Promise.all([getSiteConfig(ctx.env), resolveRuntimeConfig(ctx)])
   return ok({
     site,
-    // 后台同样拿不到密码 / 客户端密钥明文，只拿到「有没有配、配在哪」—— 所以表单留空即代表「不修改」
+    // 后台同样拿不到密码 / 密钥明文，只拿到「有没有配、配在哪」—— 所以表单留空即代表「不修改」
     runtime: publicRuntimeConfig(runtime),
     mailPasswordSource: mailPasswordSourceOf(ctx.env, runtime.mail),
     ssoClientSecretSource: ssoClientSecretSourceOf(ctx.env, runtime.sso),
+    qrSignSecretSource: qrSignSecretSourceOf(ctx.env, runtime.sso),
   })
 }
 
 interface SiteConfigBody {
   site?: Partial<SiteConfig>
   runtime?: Partial<RuntimeConfig>
+}
+
+/**
+ * 从提交上来的对象里取出凭据字段并**摘掉它**（摘掉是为了不让明文进落库对象）。
+ *
+ * 返回 `undefined` = 前端没提交这个键 —— 后台拿不到原值，所以这就是「不修改」；
+ * 返回空串 = 明确要清除；有值 = 要更新。
+ */
+function takeSecret(holder: Record<string, unknown>, key: string): string | undefined {
+  const raw = holder[key]
+  delete holder[key]
+  return typeof raw === 'string' ? raw.trim() : undefined
+}
+
+/**
+ * 凭据字段的统一三态处理。
+ *
+ * ⚠️ `current` 必须是**未解密**的那份（来自 `resolveStoredRuntimeConfig()`）：
+ * 传解密后的明文进来，就会把库里的 `enc$` 密文降级成明文。
+ */
+async function applySecret(
+  env: RequestContext['env'],
+  submitted: string | undefined,
+  current: string | undefined,
+  encrypt: (env: RequestContext['env'], plain: string) => Promise<string>,
+): Promise<string> {
+  if (submitted === undefined) return current ?? ''
+  return submitted ? encrypt(env, submitted) : ''
+}
+
+/** 审计里记一句「哪把凭据被改 / 被清」，但**绝不记值** */
+function secretChange(name: string, submitted: string | undefined): string {
+  if (submitted === undefined) return ''
+  return submitted ? `${name}=updated` : `${name}=cleared`
 }
 
 export async function updateAdminConfig(ctx: RequestContext): Promise<Response> {
@@ -226,6 +266,7 @@ export async function updateAdminConfig(ctx: RequestContext): Promise<Response> 
   let runtime: RuntimeConfig | null = null
   let mailPasswordSource: 'database' | 'env' | 'none' | undefined
   let ssoClientSecretSource: 'database' | 'env' | 'none' | undefined
+  let qrSignSecretSource: 'database' | 'env' | 'none' | undefined
 
   if (body.site) {
     site = await setSiteConfig(ctx.env, body.site)
@@ -243,30 +284,31 @@ export async function updateAdminConfig(ctx: RequestContext): Promise<Response> 
     // 用解密后的明文当基线再写回，会把加密悄悄降级成明文
     const stored = await resolveStoredRuntimeConfig(ctx)
 
-    // SMTP 密码单独处理：前端永远看不到原值，所以
-    // 没带 password 键 = 不修改；带空串 = 清除；带内容 = 更新（落库前加密）
+    // 三处凭据共用同一套语义：没带该键 = 不修改；带空串 = 清除；带内容 = 更新（落库前加密）
     const incomingMail: Partial<SmtpConfig> = { ...(body.runtime.mail ?? {}) }
-    const submittedPassword =
-      typeof incomingMail.password === 'string' ? incomingMail.password.trim() : undefined
-    delete incomingMail.password
+    const submittedPassword = takeSecret(incomingMail, 'password')
+    const password = await applySecret(
+      ctx.env,
+      submittedPassword,
+      stored.mail.password,
+      encryptMailPassword,
+    )
 
-    let password = stored.mail.password ?? ''
-    if (submittedPassword !== undefined) {
-      password = submittedPassword ? await encryptMailPassword(ctx.env, submittedPassword) : ''
-    }
-
-    // SSO 客户端密钥同理（后端与前端共用同一套「留空 = 不修改」的约定）
     const incomingSso: Partial<SsoTarget> = { ...(body.runtime.sso ?? {}) }
-    const submittedClientSecret =
-      typeof incomingSso.clientSecret === 'string' ? incomingSso.clientSecret.trim() : undefined
-    delete incomingSso.clientSecret
-
-    let clientSecret = stored.sso.clientSecret ?? ''
-    if (submittedClientSecret !== undefined) {
-      clientSecret = submittedClientSecret
-        ? await encryptSsoClientSecret(ctx.env, submittedClientSecret)
-        : ''
-    }
+    const submittedClientSecret = takeSecret(incomingSso, 'clientSecret')
+    const clientSecret = await applySecret(
+      ctx.env,
+      submittedClientSecret,
+      stored.sso.clientSecret,
+      encryptSsoClientSecret,
+    )
+    const submittedQrSignSecret = takeSecret(incomingSso, 'qrSignSecret')
+    const qrSignSecret = await applySecret(
+      ctx.env,
+      submittedQrSignSecret,
+      stored.sso.qrSignSecret,
+      encryptQrSignSecret,
+    )
 
     // body.runtime 里可能夹带着提交上来的 mail / sso（含明文凭据），先摘掉再合并，免得明文进落库对象
     const restRuntime: Partial<RuntimeConfig> = { ...body.runtime }
@@ -277,7 +319,7 @@ export async function updateAdminConfig(ctx: RequestContext): Promise<Response> 
       ...DEFAULT_RUNTIME_CONFIG,
       ...stored,
       ...restRuntime,
-      sso: { ...stored.sso, ...incomingSso, clientSecret },
+      sso: { ...stored.sso, ...incomingSso, clientSecret, qrSignSecret },
       mail: { ...stored.mail, ...incomingMail, password },
       version: stored.version + 1,
       updatedAt: new Date().toISOString(),
@@ -287,21 +329,27 @@ export async function updateAdminConfig(ctx: RequestContext): Promise<Response> 
     // 凭据来源要在剥离前算（剥离后就看不出「数据库里有没有」了）
     mailPasswordSource = mailPasswordSourceOf(ctx.env, next.mail)
     ssoClientSecretSource = ssoClientSecretSourceOf(ctx.env, next.sso)
+    qrSignSecretSource = qrSignSecretSourceOf(ctx.env, next.sso)
     // 回给前端的永远是剥离过的版本
     runtime = publicRuntimeConfig(next)
 
-    const secretAction =
-      submittedClientSecret === undefined ? '' : submittedClientSecret ? ' ssoKey=updated' : ' ssoKey=cleared'
+    const secretAction = [
+      secretChange('mailPassword', submittedPassword),
+      secretChange('ssoClientSecret', submittedClientSecret),
+      secretChange('qrSignSecret', submittedQrSignSecret),
+    ]
+      .filter(Boolean)
+      .join(' ')
     await writeAudit(ctx.env, {
       actor: actorOf(ctx),
       action: 'switch_channel',
       resource: 'runtime_config',
-      detail: `sso=${next.sso.enabled ? 'on' : 'off'} mail=${next.mail.enabled ? 'on' : 'off'}${secretAction} → v${next.version}`,
+      detail: `sso=${next.sso.enabled ? 'on' : 'off'} mail=${next.mail.enabled ? 'on' : 'off'}${secretAction ? ` ${secretAction}` : ''} → v${next.version}`,
       ...requestMeta(ctx),
     })
   }
 
-  return ok({ site, runtime, mailPasswordSource, ssoClientSecretSource })
+  return ok({ site, runtime, mailPasswordSource, ssoClientSecretSource, qrSignSecretSource })
 }
 
 // ===== 概览与审计 =====

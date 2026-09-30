@@ -21,7 +21,7 @@ import {
   SSO_CLIENT_ID,
   type SsoMeResponse,
 } from '../../shared/sso'
-import { isSsoReady } from '../../shared/runtime'
+import { isSsoReady, type SsoTarget } from '../../shared/runtime'
 import {
   OAUTH_STATE_COOKIE,
   type Env,
@@ -35,12 +35,18 @@ import {
   readStudentSession,
   studentCookie,
 } from '../lib/student-auth'
-import { ssoClientSecretOf, ssoRedirectUriOf } from '../lib/sso-config'
+import { qrSignSecretOf, ssoClientSecretOf, ssoRedirectUriOf } from '../lib/sso-config'
 import { resolveRuntimeConfig } from './config'
 
-/** 凭证验签密钥，需与授权服务器共用 */
-function tokenSecret(env: Env): string {
-  return env.QR_SIGN_SECRET ?? 'kingcola-dev-insecure-qr-sign-secret-change-me'
+/**
+ * 凭证验签密钥：**以后台设置为准**（加密存 D1），环境变量 `QR_SIGN_SECRET` 兜底。
+ *
+ * 两处都没配时回退到开发兜底串 —— 那种状态下任何 IdP 签发的凭证都验不过，
+ * 回调会停在 `invalid_credential`（表现是「换票成功、登录却失败」）。
+ * 遇到它先看 `/api/health` 的 `qrSignSecret`，再去后台补填。
+ */
+function tokenSecretOf(env: Env, sso: SsoTarget): string {
+  return qrSignSecretOf(env, sso) || 'kingcola-dev-insecure-qr-sign-secret-change-me'
 }
 
 /** 主站在授权服务器处的注册标识：环境变量可选，缺省用内置默认值 */
@@ -56,10 +62,12 @@ interface SsoContext {
   redirectUri: string
   /** 客户端密钥：后台设置（已解密）→ 环境变量兜底 */
   clientSecret: string
+  /** 凭证验签密钥：后台设置（已解密）→ 环境变量兜底 → 开发兜底串 */
+  signSecret: string
 }
 
 /**
- * 一次登录要用到的四样东西**统一在这里取**：
+ * 一次登录要用到的五样东西**统一在这里取**：
  * 以后台设置为准（存在 D1），环境变量只作老部署的兜底 ——
  * 这样即便有人在后台改了地址或密钥，也不必重新部署就能生效。
  */
@@ -70,6 +78,7 @@ async function ssoContext(ctx: RequestContext): Promise<SsoContext> {
     clientId: clientId(ctx.env),
     redirectUri: ssoRedirectUriOf(ctx.env, runtime.sso, ctx.url.origin),
     clientSecret: ssoClientSecretOf(ctx.env, runtime.sso),
+    signSecret: tokenSecretOf(ctx.env, runtime.sso),
   }
 }
 
@@ -127,7 +136,7 @@ export async function ssoCallback(ctx: RequestContext): Promise<Response> {
   // state 必须与本机种下的 cookie 一致，挡住伪造的回调
   if (!state || !expected || state !== expected) return backToHome(origin, 'state_mismatch')
 
-  const { base, clientId: id, clientSecret } = await ssoContext(ctx)
+  const { base, clientId: id, clientSecret, signSecret } = await ssoContext(ctx)
   if (!base || !clientSecret) return backToHome(origin, 'not_configured')
 
   let tokenResponse: Response
@@ -152,7 +161,7 @@ export async function ssoCallback(ctx: RequestContext): Promise<Response> {
   // 凭证必须用共用密钥验签通过，才认这份身份 —— 不因为「是服务端调的」就无条件相信
   const claims = await verifyToken<{ sub: string; name: string; sid: string; aud?: string }>(
     payload.applyToken,
-    tokenSecret(ctx.env),
+    signSecret,
   )
   if (!claims || claims.aud !== APPLY_TOKEN_AUDIENCE) return backToHome(origin, 'invalid_credential')
 

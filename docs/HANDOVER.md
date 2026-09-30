@@ -73,7 +73,7 @@ kingcola/
 |---|---|---|
 | `SESSION_SECRET` | 管理员会话签名 | 换新值即可，代价是管理员被登出 |
 | `STUDENT_SESSION_SECRET` | 报名学生会话签名（与管理员各用各的） | 换新值即可，代价是已登录同学需重新登录 |
-| `QR_SIGN_SECRET` | 校验授权服务器签发的身份凭证，**必须与其 `APPLY_TOKEN_SECRET` 完全一致** | 回调换身份失败，需两处同时更换 |
+| `QR_SIGN_SECRET` | 校验授权服务器签发的身份凭证，**必须与其 `APPLY_TOKEN_SECRET` 完全一致**；**推荐在后台「系统设置 → 流量通道」填**（加密存 D1），环境变量只作兜底 | 回调换身份失败，需两处同时更换 |
 | `SSO_CLIENT_SECRET` | 向授权服务器换取身份时的客户端凭据，**必须与其同名变量一致**；**推荐在后台「系统设置 → 流量通道」填**（加密存 D1），环境变量只作兜底 | 回调换身份失败，需两处同时更换 |
 | ~~`RECOVERY_TOKEN`~~ | **已废弃（2026-09-29）**：安装与建管理员改由 `/install` 页面自动完成 | 不再需要，见第 5 节 |
 | `SMTP_PASSWORD` | SMTP 登录密码 / 授权码（邮件通知用，服务器地址等在后台维护） | 邮件发不出去，去邮箱服务商后台重新生成授权码即可 |
@@ -99,7 +99,7 @@ npm run db:migrate:remote
 npx wrangler secret put SESSION_SECRET          # 管理员会话
 npx wrangler secret put STUDENT_SESSION_SECRET  # 报名学生会话
 npx wrangler secret put RECOVERY_TOKEN
-npx wrangler secret put QR_SIGN_SECRET          # 校验授权服务器签发的身份凭证
+npx wrangler secret put QR_SIGN_SECRET          # 可选：校验授权服务器签发的身份凭证，也可在后台填（推荐）
 npx wrangler secret put SSO_CLIENT_SECRET       # 可选：与授权服务器约定的客户端凭据，也可在后台填（推荐）
 npx wrangler secret put SMTP_PASSWORD           # 邮件通知的 SMTP 登录密码（未启用邮件可不填）
 
@@ -620,10 +620,11 @@ POST /api/auth/logout    → 退出登录
    - 开关 + 地址缺一即视为「未接通」：官网不展示登录入口，「加入我们」页显示「暂未开放」。
    - 关闭开关只是收起入口，**已登录的同学保持登录态**。
    - 判定规则两端共用 `isSsoReady()`（`shared/runtime.ts`），避免后台与官网不一致。
-   - `wrangler.toml` / `.dev.vars` 里的 `SSO_AUTHORIZE_BASE`、`SSO_REDIRECT_URI`、`SSO_CLIENT_SECRET`
+   - `wrangler.toml` / `.dev.vars` 里的 `SSO_AUTHORIZE_BASE`、`SSO_REDIRECT_URI`、`SSO_CLIENT_SECRET`、`QR_SIGN_SECRET`
      都只是可选的部署引导值（老部署平滑过渡），后台保存过即以后台为准。
-2. `QR_SIGN_SECRET`（主站）必须与授权服务的 `APPLY_TOKEN_SECRET` 一致 —— **这个只在环境变量里**，
-   仍用 `npx wrangler secret put` 写入，后台看不到也改不了。不一致的直接表现是「回调换身份失败」。
+2. `QR_SIGN_SECRET`（主站）必须与授权服务的 `APPLY_TOKEN_SECRET` 一致 —— 同上，**也在后台填**（加密存 D1）。
+   不一致时的直接表现是「换票成功、登录却失败」，回调停在 `invalid_credential`；
+   后台没填、环境变量也没设时，主站会回退成开发兜底串（同样必然验签失败）。
 3. 把主站回调地址登记进授权服务器的客户端白名单 `SSO_CLIENTS`，
    必须**完整精确匹配**（含协议、域名、路径）；后台填的回调地址就是拿去做这件事的，
    留空时才按当前访问域名推导（线上建议显式固定，避免自定义域名与预览域名不一致）。
